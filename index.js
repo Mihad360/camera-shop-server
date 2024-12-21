@@ -6,11 +6,11 @@ require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors());
+app.use(cors({
+  origin: 'https://camera-shop-client.vercel.app'
+}));
 app.use(express.json());
 
-//  ahmedmihad962
-//  yK6JW2CKZbNkwXU8
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster25.kpsyv.mongodb.net/?retryWrites=true&w=majority&appName=Cluster25`;
 
@@ -198,6 +198,13 @@ async function run() {
       res.send(result);
     });
 
+    app.delete("/admin-products/:id", verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await productCollection.deleteOne(query);
+      res.send(result);
+    });
+
     app.get("/products/:id", verifyToken, verifySeller, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -263,29 +270,43 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/all-filter-products", async (req, res) => {
-      const { title, sort, category, brand } = req.query;
-      const query = {};
+    app.get("/all-products", async (req, res) => {
+      try {
+        const { title, sort, category, brand } = req.query;
+        const query = {};
 
-      if (title) {
-        query.title = { $regex: title, $options: "i" };
+        if (title) {
+          query.title = { $regex: title, $options: "i" };
+        }
+
+        if (category) {
+          query.category = { $regex: category, $options: "i" };
+        }
+
+        if (brand) {
+          query.brand = brand;
+        }
+
+        const sortOption = sort === "asc" ? 1 : -1;
+
+        const result = await productCollection
+          .find(query)
+          .sort({ price: sortOption })
+          .toArray();
+          
+          const productInfo = await productCollection
+          .find({}, { projection: { category: 1, brand: 1 } })
+          .toArray();
+          
+          const categories = [
+            ...new Set(productInfo.map((product) => product.category)),
+          ];
+          const brands = [...new Set(productInfo.map((product) => product.brand))];
+          
+          res.send({result, categories, brands});
+      } catch (error) {
+        console.log(error.name, error.message);
       }
-
-      if (category) {
-        query.category = { $regex: category, $options: "i" };
-      }
-
-      if (brand) {
-        query.brand = brand;
-      }
-
-      const sortOption = sort === "asc" ? 1 : -1;
-
-      const result = await productCollection
-        .find(query)
-        .sort({ price: sortOption })
-        .toArray();
-      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
